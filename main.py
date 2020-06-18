@@ -2,7 +2,7 @@
 # @Author: UnsignedByte
 # @Date:	 23:20:21, 17-Jun-2020
 # @Last Modified by:   UnsignedByte
-# @Last Modified time: 15:30:53, 18-Jun-2020
+# @Last Modified time: 16:04:07, 18-Jun-2020
 
 import discord
 import asyncio
@@ -26,7 +26,7 @@ queue = {}
 #default file
 if not os.path.isfile('data.json'):
 	with open('data.json', 'w') as f:
-		f.write(json.dumps({'queuelen':5, 'chain':{}}))
+		f.write(json.dumps({'queuelen':15, 'chain':{}}))
 
 with open('data.json', 'r') as f:
 	dat = json.load(f)
@@ -74,14 +74,14 @@ def getname(bot, msg, id):
 
 def parseMessage(bot, msg): #replaces mentions with respective names
 	return re.sub(r'<@?(.?)(:.+?:)?(\d+)>',
-		lambda x:x.group(2) if x.group(2) else getname(bot, msg, int(x.group(3))) if x.group(1) in ['', '!'] else (lambda y:y.name if y else "deleted-channel")(bot.get_channel(int(x.group(3)))) if x.group(1) == '#' else (lambda y:y.name if y else "deleted-role")(msg.guild.get_role(int(x.group(3)))) if x.group(1) == '&' else x.group(0),
+		lambda x:x.group(2) if x.group(2) else getname(bot, msg, int(x.group(3))) if x.group(1) in ['', '!'] else (lambda y:f'#{y.name if y else "deleted-channel"}')(bot.get_channel(int(x.group(3)))) if x.group(1) == '#' else (lambda y:f'@{y.name if y else "deleted-role"}')(msg.guild.get_role(int(x.group(3)))) if x.group(1) == '&' else x.group(0),
 		msg.content
 	)
 
 async def save():
 	while 1:
 		await asyncio.sleep(60);
-		print(f'{bcolors.HEADER}saving...{bcolors.ENDC}')
+		print(f'{bcolors.BOLD}{bcolors.HEADER}saving...{bcolors.ENDC}')
 		with open('data.json', 'w') as f:
 			out = json.dumps({'queuelen':ql, 'chain':markov})
 			f.write(out)
