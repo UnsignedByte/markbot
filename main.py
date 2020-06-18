@@ -2,7 +2,7 @@
 # @Author: UnsignedByte
 # @Date:	 23:20:21, 17-Jun-2020
 # @Last Modified by:   UnsignedByte
-# @Last Modified time: 15:09:01, 18-Jun-2020
+# @Last Modified time: 15:30:53, 18-Jun-2020
 
 import discord
 import asyncio
@@ -61,7 +61,7 @@ def getchar(channelid):
 def getchars(channelid):
 	out = ""
 	while(len(out) < 2000):
-		c = getchar()
+		c = getchar(channelid)
 		if len(out) > 0 or c != '\n':
 			queue[channelid]+=c;
 		out+=c;
@@ -81,7 +81,7 @@ def parseMessage(bot, msg): #replaces mentions with respective names
 async def save():
 	while 1:
 		await asyncio.sleep(60);
-		print(f'{bcolors.OKGREEN}saving...{bcolors.ENDC}')
+		print(f'{bcolors.HEADER}saving...{bcolors.ENDC}')
 		with open('data.json', 'w') as f:
 			out = json.dumps({'queuelen':ql, 'chain':markov})
 			f.write(out)
@@ -89,11 +89,11 @@ async def save():
 
 async def sendMessage(channel):
 	try:
-		await channel.send(getchars());
+		await channel.send(getchars(channel.id));
 		if random.random() < 1/5:
 			await sendMessage(channel);
-	except Exception:
-		pass;
+	except Exception as e:
+		await channel.send(e)
 
 class Client(discord.Client):
 	async def on_ready(self):
@@ -101,7 +101,7 @@ class Client(discord.Client):
 		await asyncio.gather(save())
 	async def on_message(self, msg):
 		parsed = parseMessage(bot, msg)
-		print(f'Recieved\n{parsed}\nfrom {msg.author.display_name}\n')
+		print(f'Recieved\n{parsed}\nfrom {bcolors.OKGREEN}{msg.author.display_name}{bcolors.ENDC}\n')
 		if re.match(f'<@!?{self.user.id}>', msg.content):
 			await sendMessage(msg.channel);
 		else:
