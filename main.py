@@ -2,7 +2,7 @@
 # @Author: UnsignedByte
 # @Date:	 23:20:21, 17-Jun-2020
 # @Last Modified by:   UnsignedByte
-# @Last Modified time: 18:56:40, 18-Jun-2020
+# @Last Modified time: 21:48:04, 18-Jun-2020
 
 import discord
 import asyncio
@@ -10,6 +10,8 @@ import re
 import pickle
 import os
 import random
+import math
+import sys
 
 class bcolors:
   HEADER = '\033[95m'
@@ -81,13 +83,29 @@ def parseMessage(bot, msg): #replaces mentions with respective names
 		msg.content
 	)
 
+#decay brain data randomly
+def decay(times):
+	chosenseq = random.choices(list(markov.keys()), k=times)
+	for s in chosenseq:
+		chosenlet = random.choice(list(markov[s].keys()))
+		# decay
+		# \left(\sin\frac{\pi x}{2}\right)^{\frac{1}{10}}
+		markov[s][chosenlet] = int((math.sin(random.random()*math.pi/2)**0.1)*markov[s][chosenlet])
+
 async def save():
 	while 1:
 		await asyncio.sleep(60);
+		bsize = sys.getsizeof(markov)
+		print(f'Brain is {bcolors.WARNING}{bsize}{bcolors.ENDC} bytes in size.\n Decaying...')
+		times = random.randrange(int(sys.getsizeof(markov)**0.5))
+		decay(times)
+		nsize = sys.getsizeof(markov)
+		print(f'Decayed {bcolors.WARNING}{times}{bcolors.ENDC} times.\nBrain is now {bcolors.WARNING}{nsize}{bcolors.ENDC} bytes in size.')
+
 		print(f'{bcolors.BOLD}{bcolors.HEADER}saving...{bcolors.ENDC}')
 		with open('data.txt', 'wb') as f:
 			pickle.dump({'queuelen':ql, 'chain':markov}, f)
-		print(f'{bcolors.OKGREEN}saved {os.path.getsize("data.txt")} bytes{bcolors.ENDC}\n')
+		print(f'{bcolors.OKGREEN}saved {bcolors.WARNING}{os.path.getsize("data.txt")}{bcolors.ENDC} bytes{bcolors.ENDC}\n')
 
 async def sendMessage(channel):
 	try:
@@ -101,8 +119,9 @@ class Client(discord.Client):
 		print("ready")
 		await asyncio.gather(save())
 	async def on_message(self, msg):
-		if msg.author.id == self.user.id: return
+		# if msg.author.id == self.user.id: return
 		parsed = parseMessage(bot, msg)
+		# sys.getsizeof(markov)
 		print(f'Recieved\n{parsed}\nfrom {bcolors.OKGREEN}{msg.author.display_name}{bcolors.ENDC}\n')
 		if re.match(f'<@!?{self.user.id}>', msg.content):
 			await sendMessage(msg.channel);
