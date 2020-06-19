@@ -2,7 +2,7 @@
 # @Author: UnsignedByte
 # @Date:	 23:20:21, 17-Jun-2020
 # @Last Modified by:   UnsignedByte
-# @Last Modified time: 22:31:46, 18-Jun-2020
+# @Last Modified time: 23:19:15, 18-Jun-2020
 
 import discord
 import asyncio
@@ -91,7 +91,7 @@ def decay(times):
 		# decay
 		# \left(\sin\frac{\pi x}{2}\right)^{\frac{1}{10}}
 		countlost+=markov[s][chosenlet]
-		markov[s][chosenlet] = int((math.sin(random.random()*math.pi/2)**0.1)*markov[s][chosenlet])
+		markov[s][chosenlet] = round((math.sin(random.random()*math.pi/2)**0.1)*markov[s][chosenlet])
 		countlost-=markov[s][chosenlet]
 	return countlost
 
