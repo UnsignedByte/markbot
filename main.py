@@ -2,16 +2,15 @@
 # @Author: UnsignedByte
 # @Date:	 23:20:21, 17-Jun-2020
 # @Last Modified by:   UnsignedByte
-# @Last Modified time: 21:48:04, 18-Jun-2020
+# @Last Modified time: 22:31:46, 18-Jun-2020
 
 import discord
 import asyncio
 import re
-import pickle
+import json
 import os
 import random
 import math
-import sys
 
 class bcolors:
   HEADER = '\033[95m'
@@ -26,13 +25,13 @@ class bcolors:
 queue = {}
 
 #default file
-if not os.path.isfile('data.txt'):
-	with open('data.txt', 'wb') as f:
-		pickle.dump({'queuelen':10, 'chain':{}}, f)
+if not os.path.isfile('data.json'):
+	with open('data.json', 'w') as f:
+		json.dump({'queuelen':10, 'chain':{}}, f)
 
-with open('data.txt', 'rb') as f:
+with open('data.json', 'r') as f:
 	try:
-		dat = pickle.load(f)
+		dat = json.load(f)
 		ql = dat['queuelen']
 		markov = dat['chain']
 	except EOFError as e:
@@ -85,27 +84,30 @@ def parseMessage(bot, msg): #replaces mentions with respective names
 
 #decay brain data randomly
 def decay(times):
+	countlost = 0;
 	chosenseq = random.choices(list(markov.keys()), k=times)
 	for s in chosenseq:
 		chosenlet = random.choice(list(markov[s].keys()))
 		# decay
 		# \left(\sin\frac{\pi x}{2}\right)^{\frac{1}{10}}
+		countlost+=markov[s][chosenlet]
 		markov[s][chosenlet] = int((math.sin(random.random()*math.pi/2)**0.1)*markov[s][chosenlet])
+		countlost-=markov[s][chosenlet]
+	return countlost
 
 async def save():
 	while 1:
-		await asyncio.sleep(60);
-		bsize = sys.getsizeof(markov)
-		print(f'Brain is {bcolors.WARNING}{bsize}{bcolors.ENDC} bytes in size.\n Decaying...')
-		times = random.randrange(int(sys.getsizeof(markov)**0.5))
-		decay(times)
-		nsize = sys.getsizeof(markov)
-		print(f'Decayed {bcolors.WARNING}{times}{bcolors.ENDC} times.\nBrain is now {bcolors.WARNING}{nsize}{bcolors.ENDC} bytes in size.')
-
+		fsize = os.path.getsize("data.json");
+		print(f'Brain is {bcolors.WARNING}{fsize}{bcolors.ENDC} bytes.')
+		print(f'{bcolors.BOLD}{bcolors.HEADER}Decaying...{bcolors.ENDC}')
+		times = random.randrange(int(fsize**0.5))
+		decayed = decay(times)
+		print(f'Decayed {bcolors.WARNING}{times}{bcolors.ENDC} times, losing {bcolors.WARNING}{decayed}{bcolors.ENDC} remembrances.')
 		print(f'{bcolors.BOLD}{bcolors.HEADER}saving...{bcolors.ENDC}')
-		with open('data.txt', 'wb') as f:
-			pickle.dump({'queuelen':ql, 'chain':markov}, f)
-		print(f'{bcolors.OKGREEN}saved {bcolors.WARNING}{os.path.getsize("data.txt")}{bcolors.ENDC} bytes{bcolors.ENDC}\n')
+		with open('data.json', 'w') as f:
+			json.dump({'queuelen':ql, 'chain':markov}, f)
+		print(f'Brain is now {bcolors.WARNING}{os.path.getsize("data.json")}{bcolors.ENDC} bytes.')
+		await asyncio.sleep(60);
 
 async def sendMessage(channel):
 	try:
@@ -121,7 +123,6 @@ class Client(discord.Client):
 	async def on_message(self, msg):
 		# if msg.author.id == self.user.id: return
 		parsed = parseMessage(bot, msg)
-		# sys.getsizeof(markov)
 		print(f'Recieved\n{parsed}\nfrom {bcolors.OKGREEN}{msg.author.display_name}{bcolors.ENDC}\n')
 		if re.match(f'<@!?{self.user.id}>', msg.content):
 			await sendMessage(msg.channel);
