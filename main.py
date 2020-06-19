@@ -2,7 +2,7 @@
 # @Author: UnsignedByte
 # @Date:	 23:20:21, 17-Jun-2020
 # @Last Modified by:   UnsignedByte
-# @Last Modified time: 01:52:53, 19-Jun-2020
+# @Last Modified time: 11:10:01, 19-Jun-2020
 
 import discord
 import asyncio
@@ -27,16 +27,18 @@ queue = {}
 #default file
 if not os.path.isfile('data.json'):
 	with open('data.json', 'w') as f:
-		json.dump({'queuelen':10, 'chain':{}}, f)
+		json.dump({'queuelen':10, 'chain':{}, 'rates':{}}, f)
 
 with open('data.json', 'r') as f:
 	try:
 		dat = json.load(f)
 		ql = dat['queuelen']
 		markov = dat['chain']
+		rates = dat['rates']
 	except EOFError as e:
 		ql = 10
 		markov = {}
+		rates = {}
 
 def updatemarkov(channelid, content):
 	if channelid not in queue: queue[channelid] = ""
@@ -111,30 +113,41 @@ async def save():
 		print(f'Decayed {bcolors.WARNING}{times}{bcolors.ENDC} times, losing {bcolors.WARNING}{decayed}{bcolors.ENDC} remembrances.')
 		print(f'{bcolors.BOLD}{bcolors.HEADER}saving...{bcolors.ENDC}')
 		with open('data.json', 'w') as f:
-			json.dump({'queuelen':ql, 'chain':markov}, f)
+			json.dump({'queuelen':ql, 'rates':rates, 'chain':markov}, f)
 		print(f'Brain is now {bcolors.WARNING}{os.path.getsize("data.json")}{bcolors.ENDC} bytes.\n')
 		await asyncio.sleep(60);
 
 async def sendMessage(channel):
 	try:
 		out = getchars(channel.id);
-		await channel.send(getchars(channel.id));
+		async with channel.typing():
+			await asyncio.sleep(random.random()/5*len(out))
+			await channel.send(out);
 	except Exception as e:
-		print(f'{bolors.FAIL}{e}{bcolors.ENDC}')
+		print(f'{bcolors.FAIL}{e}{bcolors.ENDC}')
 
+scaryprefix = "hi this is a wendy's and also, to marc: "
 class Client(discord.Client):
 	async def on_ready(self):
 		print("ready")
 		await asyncio.gather(save())
 	async def on_message(self, msg):
-		# if msg.author.id == self.user.id: return
+		if not msg.author.bot and msg.content.startswith(scaryprefix):
+			cont = msg.content[len(scaryprefix):];
+			f = re.match(r'^sucky set rate to (\d+)/(\d+)$', cont);
+			if f:
+				rates[str(msg.channel.id)] = int(f.group(1))/int(f.group(2));
+				print(f"{bcolors.HEADER}Set rate for channel {msg.channel.name} to {rates[str(msg.channel.id)]}.{bcolors.ENDC}\n")
+			return;
 		parsed = parseMessage(bot, msg)
 		print(f'Recieved\n{parsed}\nfrom {bcolors.OKGREEN}{msg.author.display_name}{bcolors.ENDC}\n')
 		if re.match(f'<@!?{self.user.id}>', msg.content):
 			await sendMessage(msg.channel);
 		else:
 			updatemarkov(msg.channel.id, parsed+'\n')
-			if random.random() < 1/30 or self.user in msg.mentions:
+			if msg.author.id != self.user.id and \
+					(random.random() < (rates[str(msg.channel.id)] if str(msg.channel.id) in rates else 1/30) or \
+					self.user in msg.mentions):
 				await sendMessage(msg.channel);
 		
 bot = Client()
