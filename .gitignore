@@ -124,8 +124,7 @@ dmypy.json
 # Pyre type checker
 .pyre/
 
-token.txt
-data.json
-data.txt
+*.txt
+*.json
 
 .DS_Store

@@ -2,7 +2,7 @@
 # @Author: UnsignedByte
 # @Date:	 23:20:21, 17-Jun-2020
 # @Last Modified by:   UnsignedByte
-# @Last Modified time: 23:19:15, 18-Jun-2020
+# @Last Modified time: 01:52:53, 19-Jun-2020
 
 import discord
 import asyncio
@@ -85,20 +85,26 @@ def parseMessage(bot, msg): #replaces mentions with respective names
 #decay brain data randomly
 def decay(times):
 	countlost = 0;
+	if len(markov) == 0: return 0;
 	chosenseq = random.choices(list(markov.keys()), k=times)
 	for s in chosenseq:
+		if not s in markov: continue;
 		chosenlet = random.choice(list(markov[s].keys()))
 		# decay
 		# \left(\sin\frac{\pi x}{2}\right)^{\frac{1}{10}}
 		countlost+=markov[s][chosenlet]
 		markov[s][chosenlet] = round((math.sin(random.random()*math.pi/2)**0.1)*markov[s][chosenlet])
 		countlost-=markov[s][chosenlet]
+		if markov[s][chosenlet] == 0:
+			del markov[s][chosenlet]
+		if len(markov[s]) == 0:
+			del markov[s]
 	return countlost
 
 async def save():
 	while 1:
 		fsize = os.path.getsize("data.json");
-		print(f'Brain is {bcolors.WARNING}{fsize}{bcolors.ENDC} bytes.')
+		print(f'Brain was {bcolors.WARNING}{fsize}{bcolors.ENDC} bytes.')
 		print(f'{bcolors.BOLD}{bcolors.HEADER}Decaying...{bcolors.ENDC}')
 		times = random.randrange(int(fsize**0.5))
 		decayed = decay(times)
@@ -106,7 +112,7 @@ async def save():
 		print(f'{bcolors.BOLD}{bcolors.HEADER}saving...{bcolors.ENDC}')
 		with open('data.json', 'w') as f:
 			json.dump({'queuelen':ql, 'chain':markov}, f)
-		print(f'Brain is now {bcolors.WARNING}{os.path.getsize("data.json")}{bcolors.ENDC} bytes.')
+		print(f'Brain is now {bcolors.WARNING}{os.path.getsize("data.json")}{bcolors.ENDC} bytes.\n')
 		await asyncio.sleep(60);
 
 async def sendMessage(channel):
