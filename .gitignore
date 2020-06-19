@@ -126,3 +126,5 @@ dmypy.json
 
 token.txt
 data.json
+
+.DS_Store

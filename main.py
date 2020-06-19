@@ -2,7 +2,7 @@
 # @Author: UnsignedByte
 # @Date:	 23:20:21, 17-Jun-2020
 # @Last Modified by:   UnsignedByte
-# @Last Modified time: 16:04:07, 18-Jun-2020
+# @Last Modified time: 18:23:53, 18-Jun-2020
 
 import discord
 import asyncio
@@ -46,13 +46,14 @@ def updatemarkov(channelid, content):
 				markov[queue[channelid][:i]][queue[channelid][i]] += 1;
 		queue[channelid] = queue[channelid][1:]
 
-def getchar(channelid):
+def getchar(channelid, tq):
 	out = '\n'
+	last = queue[channelid]+tq;
 	for i in range(ql,0,-1):
-		if len(queue[channelid]) < i or queue[channelid][-i:] not in markov: continue;
-		curr = markov[queue[channelid][-i:]]
+		if len(last) < i or last[-i:] not in markov: continue;
+		curr = markov[last[-i:]]
 		ret = random.choices(list(curr.keys()), weights=list(curr.values()), k=1)[0];
-		if random.random() < 0.4:
+		if random.random() < 0.5:
 			return ret
 		else:
 			out = ret
@@ -61,11 +62,9 @@ def getchar(channelid):
 def getchars(channelid):
 	out = ""
 	while(len(out) < 2000):
-		c = getchar(channelid)
-		if len(out) > 0 or c != '\n':
-			queue[channelid]+=c;
+		c = getchar(channelid, out)
 		out+=c;
-		if out[-1] == '\n': break;
+		if out[-1] == '\n' and random.random() < 4/5: break;
 	return out[:-1];
 
 def getname(bot, msg, id):
@@ -89,24 +88,24 @@ async def save():
 
 async def sendMessage(channel):
 	try:
+		out = getchars(channel.id);
 		await channel.send(getchars(channel.id));
-		if random.random() < 1/5:
-			await sendMessage(channel);
 	except Exception as e:
-		await channel.send(e)
+		print(f'{bolors.FAIL}{e}{bcolors.ENDC}')
 
 class Client(discord.Client):
 	async def on_ready(self):
 		print("ready")
 		await asyncio.gather(save())
 	async def on_message(self, msg):
+		if msg.author.id == self.user.id: return
 		parsed = parseMessage(bot, msg)
 		print(f'Recieved\n{parsed}\nfrom {bcolors.OKGREEN}{msg.author.display_name}{bcolors.ENDC}\n')
 		if re.match(f'<@!?{self.user.id}>', msg.content):
 			await sendMessage(msg.channel);
 		else:
 			updatemarkov(msg.channel.id, parsed+'\n')
-			if random.random() < 1/20 or self.user in msg.mentions:
+			if random.random() < 1/30 or self.user in msg.mentions:
 				await sendMessage(msg.channel);
 		
 bot = Client()
