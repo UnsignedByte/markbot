@@ -2,12 +2,12 @@
 # @Author: UnsignedByte
 # @Date:	 23:20:21, 17-Jun-2020
 # @Last Modified by:   UnsignedByte
-# @Last Modified time: 18:23:53, 18-Jun-2020
+# @Last Modified time: 18:56:40, 18-Jun-2020
 
 import discord
 import asyncio
 import re
-import json
+import pickle
 import os
 import random
 
@@ -24,14 +24,18 @@ class bcolors:
 queue = {}
 
 #default file
-if not os.path.isfile('data.json'):
-	with open('data.json', 'w') as f:
-		f.write(json.dumps({'queuelen':15, 'chain':{}}))
+if not os.path.isfile('data.txt'):
+	with open('data.txt', 'wb') as f:
+		pickle.dump({'queuelen':10, 'chain':{}}, f)
 
-with open('data.json', 'r') as f:
-	dat = json.load(f)
-	ql = dat['queuelen']
-	markov = dat['chain']
+with open('data.txt', 'rb') as f:
+	try:
+		dat = pickle.load(f)
+		ql = dat['queuelen']
+		markov = dat['chain']
+	except EOFError as e:
+		ql = 10
+		markov = {}
 
 def updatemarkov(channelid, content):
 	if channelid not in queue: queue[channelid] = ""
@@ -81,10 +85,9 @@ async def save():
 	while 1:
 		await asyncio.sleep(60);
 		print(f'{bcolors.BOLD}{bcolors.HEADER}saving...{bcolors.ENDC}')
-		with open('data.json', 'w') as f:
-			out = json.dumps({'queuelen':ql, 'chain':markov})
-			f.write(out)
-		print(f'{bcolors.OKGREEN}saved {len(out)} characters{bcolors.ENDC}\n')
+		with open('data.txt', 'wb') as f:
+			pickle.dump({'queuelen':ql, 'chain':markov}, f)
+		print(f'{bcolors.OKGREEN}saved {os.path.getsize("data.txt")} bytes{bcolors.ENDC}\n')
 
 async def sendMessage(channel):
 	try:
