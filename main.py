@@ -2,7 +2,7 @@
 # @Author: UnsignedByte
 # @Date:	 23:20:21, 17-Jun-2020
 # @Last Modified by:   UnsignedByte
-# @Last Modified time: 23:58:07, 19-Jun-2020
+# @Last Modified time: 02:56:03, 20-Jun-2020
 
 import discord
 import asyncio
@@ -89,7 +89,7 @@ def getname(bot, msg, id):
 
 def parseMessage(bot, msg): #replaces mentions with respective names
 	return re.sub(r'<@?(.?)(:.+?:)?(\d+)>',
-		lambda x:x.group(2) if x.group(2) else getname(bot, msg, int(x.group(3))) if x.group(1) in ['', '!'] else (lambda y:f'#{y.name if y else "deleted-channel"}')(bot.get_channel(int(x.group(3)))) if x.group(1) == '#' else (lambda y:f'@{y.name if y else "deleted-role"}')(msg.guild.get_role(int(x.group(3)))) if x.group(1) == '&' else x.group(0),
+		lambda x:x.group(2) if x.group(2) else f"@{getname(bot, msg, int(x.group(3)))}" if x.group(1) in ['', '!'] else (lambda y:f'#{y.name if y else "deleted-channel"}')(bot.get_channel(int(x.group(3)))) if x.group(1) == '#' else (lambda y:f'@{y.name if y else "deleted-role"}')(msg.guild.get_role(int(x.group(3)))) if x.group(1) == '&' else x.group(0),
 		msg.content
 	)
 
@@ -185,7 +185,7 @@ class Client(discord.Client):
 					(random.random() < (rates[channelid] if channelid in rates else 1/30) or \
 					self.user in msg.mentions):
 				await sendMessage(msg.channel);
-		
+
 bot = Client()
 
 with open('token.txt', 'r') as f:
