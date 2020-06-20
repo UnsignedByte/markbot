@@ -2,7 +2,7 @@
 # @Author: UnsignedByte
 # @Date:	 23:20:21, 17-Jun-2020
 # @Last Modified by:   UnsignedByte
-# @Last Modified time: 17:48:24, 19-Jun-2020
+# @Last Modified time: 20:23:16, 19-Jun-2020
 
 import discord
 import asyncio
@@ -93,14 +93,18 @@ def decay(times):
 	chosenseq = random.choices(list(markov.keys()), k=times)
 	for s in chosenseq:
 		if not s in markov: continue;
-		chosenlet = random.choice(list(markov[s].keys()))
-		# decay
-		# \left(\sin\frac{\pi x}{2}\right)^{\frac{1}{10}}
-		countlost+=markov[s][chosenlet]
-		markov[s][chosenlet] = int((math.sin(random.random()*math.pi/2)**0.1)*markov[s][chosenlet])
-		countlost-=markov[s][chosenlet]
-		if markov[s][chosenlet] == 0:
-			del markov[s][chosenlet]
+		total = sum(markov[s].values())
+		chosenlet = random.choices(list(markov[s].keys()), k=random.randrange(len(markov[s])+1))
+		for k in chosenlet:
+			if not k in markov[s]: continue;
+			# decay
+			# \left(\cos\frac{\pi x}{2}\right)^{\frac{1}{4}} \cdot\left(\frac{\sqrt{n}+1}{2}\right)
+			countlost+=markov[s][k]
+			dratio = (math.sin(markov[s][k]/total*math.pi/2)**0.25)*(random.random()**0.5+1)/2;
+			markov[s][k] = round(dratio*markov[s][k])
+			countlost-=markov[s][k]
+			if markov[s][k] == 0:
+				del markov[s][k]
 		if len(markov[s]) == 0:
 			del markov[s]
 	return countlost
@@ -113,15 +117,20 @@ async def save():
 		a = datetime.datetime.now()
 		print(f'Brain was {bcolors.WARNING}{fsize}{bcolors.ENDC} bytes with {bcolors.WARNING}{len(markov)}{bcolors.ENDC} sequences.')
 		print(f'{bcolors.BOLD}{bcolors.HEADER}Decaying...{bcolors.ENDC}')
-		times = random.randrange(int(len(markov)/8))*savemins
-		decayed = decay(times)
+		decayed = 0
+		times = 0
+		for i in range(savemins):
+			# \frac{2}{1+\left(1+\frac{1}{5\cdot10^{7}}\right)^{-x}}-1 
+			n = int(random.random()*(2/(1+(1+10**-6/3)**-len(markov))-1)*len(markov))
+			decayed += decay(n)
+			times+=n
 		print(f'Decayed {bcolors.WARNING}{times}{bcolors.ENDC} times, losing {bcolors.WARNING}{decayed}{bcolors.ENDC} remembrances.')
 		b = datetime.datetime.now()
 		print(f'Process took {bcolors.WARNING}{int((b-a).total_seconds()*1000)} ms{bcolors.ENDC}.\n')
 		print(f'{bcolors.BOLD}{bcolors.HEADER}saving...{bcolors.ENDC}')
 		with open('data.msgpack', 'wb') as f:
 			msgpack.dump({'queuelen':ql, 'rates':rates, 'chain':markov}, f)
-		print(f'Brain is now {bcolors.WARNING}{os.path.getsize("data.msgpack")}{bcolors.ENDC} bytes.')
+		print(f'Brain is now {bcolors.WARNING}{os.path.getsize("data.msgpack")}{bcolors.ENDC} bytes with {bcolors.WARNING}{len(markov)}{bcolors.ENDC} sequences.')
 		print(f'Process took {bcolors.WARNING}{int((datetime.datetime.now()-b).total_seconds()*1000)} ms{bcolors.ENDC}.\n')
 		await asyncio.sleep(savemins*60);
 
