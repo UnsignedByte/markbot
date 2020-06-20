@@ -2,7 +2,7 @@
 # @Author: UnsignedByte
 # @Date:	 23:20:21, 17-Jun-2020
 # @Last Modified by:   UnsignedByte
-# @Last Modified time: 21:24:48, 19-Jun-2020
+# @Last Modified time: 23:58:07, 19-Jun-2020
 
 import discord
 import asyncio
@@ -44,7 +44,12 @@ with open('data.msgpack', 'rb') as f:
 		markov = {}
 		rates = {}
 
-def updatemarkov(channelid, content):
+def toweight(key, l):
+	# 1-\frac{1}{1+\frac{\sqrt{\frac{x}{2000}}}{1-\frac{x}{2000}}^{-3}}
+
+	return (lambda x: 1 if x == 0 else 1-(1/(1+(x/(1-x))**-3)))(l/2000)/weights[key]
+
+def updatemarkov(channelid, content, weight):
 	if channelid not in queue: queue[channelid] = ""
 	queue[channelid]+=content
 	while len(queue[channelid]) > ql:
@@ -52,9 +57,9 @@ def updatemarkov(channelid, content):
 			if queue[channelid][:i] not in markov:
 				markov[queue[channelid][:i]] = {};
 			if queue[channelid][i] not in markov[queue[channelid][:i]]:
-				markov[queue[channelid][:i]][queue[channelid][i]] = 1/weights[channelid];
+				markov[queue[channelid][:i]][queue[channelid][i]] = weight;
 			else:
-				markov[queue[channelid][:i]][queue[channelid][i]] += 1/weights[channelid];
+				markov[queue[channelid][:i]][queue[channelid][i]] += weight;
 		queue[channelid] = queue[channelid][1:]
 
 def getchar(channelid, tq):
@@ -103,9 +108,9 @@ def decay(times):
 			# \left(\cos\frac{\pi x}{2}\right)^{\frac{1}{4}} \cdot\left(\frac{\sqrt{n}+1}{2}\right)
 			countlost+=markov[s][k]
 			dratio = (math.sin(markov[s][k]/total*math.pi/2)**0.25)*(random.random()**0.5+1)/2;
-			markov[s][k] = round(dratio*markov[s][k])
+			markov[s][k] = dratio*markov[s][k]
 			countlost-=markov[s][k]
-			if markov[s][k] == 0:
+			if markov[s][k] < 0.1:
 				del markov[s][k]
 		if len(markov[s]) == 0:
 			del markov[s]
@@ -137,7 +142,7 @@ async def save():
 		await asyncio.sleep(savemins*60);
 
 #optimal seconds between messages
-msecs = 5;
+msecs = 4;
 async def decSecond():
 	while 1:
 		for k in weights.keys():
@@ -148,8 +153,7 @@ async def sendMessage(channel):
 	try:
 		out = getchars(str(channel.id));
 		async with channel.typing():
-			
-			await asyncio.sleep(random.random()/5*len(out))
+			await asyncio.sleep(random.random()/10*len(out))
 			await channel.send(out);
 	except Exception as e:
 		print(f'{bcolors.FAIL}{traceback.format_exc()}{bcolors.ENDC}\n')
@@ -169,13 +173,14 @@ class Client(discord.Client):
 				print(f"{bcolors.HEADER}Set rate for channel {msg.channel.name} to {rates[channelid]}.{bcolors.ENDC}\n")
 			return;
 		parsed = parseMessage(bot, msg)
-		print(f'Recieved\n{parsed}\nfrom {bcolors.OKGREEN}{msg.author.display_name}{bcolors.ENDC}\n')
 		if re.match(f'<@!?{self.user.id}>', msg.content):
 			await sendMessage(msg.channel);
 		else:
-			if not channelid in weights: weights[channelid] = 0
-			weights[channelid] += 1;
-			updatemarkov(channelid, parsed+'\n')
+			if not msg.author.id in weights: weights[msg.author.id] = 0
+			weights[msg.author.id] += 1;
+			weight = toweight(msg.author.id, len(msg.content));
+			print(f'Recieved\n{parsed}\nfrom {bcolors.OKGREEN}{msg.author.display_name}{bcolors.ENDC} with weight {bcolors.OKGREEN}{weight}{bcolors.ENDC}.\n')
+			updatemarkov(channelid, parsed+'\n', weight)
 			if msg.author.id != self.user.id and \
 					(random.random() < (rates[channelid] if channelid in rates else 1/30) or \
 					self.user in msg.mentions):
