@@ -2,7 +2,7 @@
 # @Author: UnsignedByte
 # @Date:	 23:20:21, 17-Jun-2020
 # @Last Modified by:   UnsignedByte
-# @Last Modified time: 20:23:16, 19-Jun-2020
+# @Last Modified time: 21:24:48, 19-Jun-2020
 
 import discord
 import asyncio
@@ -13,6 +13,7 @@ import random
 import math
 import time
 import datetime
+import traceback
 
 class bcolors:
   HEADER = '\033[95m'
@@ -25,6 +26,7 @@ class bcolors:
   UNDERLINE = '\033[4m'
 
 queue = {}
+weights = {}
 
 #default file
 if not os.path.isfile('data.msgpack'):
@@ -50,9 +52,9 @@ def updatemarkov(channelid, content):
 			if queue[channelid][:i] not in markov:
 				markov[queue[channelid][:i]] = {};
 			if queue[channelid][i] not in markov[queue[channelid][:i]]:
-				markov[queue[channelid][:i]][queue[channelid][i]] = 1;
+				markov[queue[channelid][:i]][queue[channelid][i]] = 1/weights[channelid];
 			else:
-				markov[queue[channelid][:i]][queue[channelid][i]] += 1;
+				markov[queue[channelid][:i]][queue[channelid][i]] += 1/weights[channelid];
 		queue[channelid] = queue[channelid][1:]
 
 def getchar(channelid, tq):
@@ -134,37 +136,48 @@ async def save():
 		print(f'Process took {bcolors.WARNING}{int((datetime.datetime.now()-b).total_seconds()*1000)} ms{bcolors.ENDC}.\n')
 		await asyncio.sleep(savemins*60);
 
+#optimal seconds between messages
+msecs = 5;
+async def decSecond():
+	while 1:
+		for k in weights.keys():
+			weights[k] = max(weights[k]-1/msecs, 0);
+		await asyncio.sleep(1);
+
 async def sendMessage(channel):
 	try:
-		out = getchars(channel.id);
+		out = getchars(str(channel.id));
 		async with channel.typing():
 			
 			await asyncio.sleep(random.random()/5*len(out))
 			await channel.send(out);
 	except Exception as e:
-		print(f'{bcolors.FAIL}{e}{bcolors.ENDC}\n')
+		print(f'{bcolors.FAIL}{traceback.format_exc()}{bcolors.ENDC}\n')
 
 scaryprefix = "hi this is a wendy's and also, to marc: "
 class Client(discord.Client):
 	async def on_ready(self):
 		print("ready")
-		await asyncio.gather(save())
+		await asyncio.gather(save(), decSecond())
 	async def on_message(self, msg):
+		channelid = str(msg.channel.id)
 		if not msg.author.bot and msg.content.startswith(scaryprefix):
 			cont = msg.content[len(scaryprefix):];
 			f = re.match(r'^sucky set rate to (\d+)/(\d+)$', cont);
 			if f:
-				rates[str(msg.channel.id)] = int(f.group(1))/int(f.group(2));
-				print(f"{bcolors.HEADER}Set rate for channel {msg.channel.name} to {rates[str(msg.channel.id)]}.{bcolors.ENDC}\n")
+				rates[channelid] = int(f.group(1))/int(f.group(2));
+				print(f"{bcolors.HEADER}Set rate for channel {msg.channel.name} to {rates[channelid]}.{bcolors.ENDC}\n")
 			return;
 		parsed = parseMessage(bot, msg)
 		print(f'Recieved\n{parsed}\nfrom {bcolors.OKGREEN}{msg.author.display_name}{bcolors.ENDC}\n')
 		if re.match(f'<@!?{self.user.id}>', msg.content):
 			await sendMessage(msg.channel);
 		else:
-			updatemarkov(msg.channel.id, parsed+'\n')
+			if not channelid in weights: weights[channelid] = 0
+			weights[channelid] += 1;
+			updatemarkov(channelid, parsed+'\n')
 			if msg.author.id != self.user.id and \
-					(random.random() < (rates[str(msg.channel.id)] if str(msg.channel.id) in rates else 1/30) or \
+					(random.random() < (rates[channelid] if channelid in rates else 1/30) or \
 					self.user in msg.mentions):
 				await sendMessage(msg.channel);
 		
