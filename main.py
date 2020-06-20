@@ -2,15 +2,17 @@
 # @Author: UnsignedByte
 # @Date:	 23:20:21, 17-Jun-2020
 # @Last Modified by:   UnsignedByte
-# @Last Modified time: 11:10:01, 19-Jun-2020
+# @Last Modified time: 17:48:24, 19-Jun-2020
 
 import discord
 import asyncio
 import re
-import json
+import msgpack
 import os
 import random
 import math
+import time
+import datetime
 
 class bcolors:
   HEADER = '\033[95m'
@@ -25,13 +27,13 @@ class bcolors:
 queue = {}
 
 #default file
-if not os.path.isfile('data.json'):
-	with open('data.json', 'w') as f:
-		json.dump({'queuelen':10, 'chain':{}, 'rates':{}}, f)
+if not os.path.isfile('data.msgpack'):
+	with open('data.msgpack', 'wb') as f:
+		msgpack.dump({'queuelen':10, 'chain':{}, 'rates':{}}, f)
 
-with open('data.json', 'r') as f:
+with open('data.msgpack', 'rb') as f:
 	try:
-		dat = json.load(f)
+		dat = msgpack.load(f)
 		ql = dat['queuelen']
 		markov = dat['chain']
 		rates = dat['rates']
@@ -64,7 +66,7 @@ def getchar(channelid, tq):
 			return ret
 		else:
 			out = ret
-	return ret
+	return out
 
 def getchars(channelid):
 	out = ""
@@ -95,7 +97,7 @@ def decay(times):
 		# decay
 		# \left(\sin\frac{\pi x}{2}\right)^{\frac{1}{10}}
 		countlost+=markov[s][chosenlet]
-		markov[s][chosenlet] = round((math.sin(random.random()*math.pi/2)**0.1)*markov[s][chosenlet])
+		markov[s][chosenlet] = int((math.sin(random.random()*math.pi/2)**0.1)*markov[s][chosenlet])
 		countlost-=markov[s][chosenlet]
 		if markov[s][chosenlet] == 0:
 			del markov[s][chosenlet]
@@ -103,28 +105,35 @@ def decay(times):
 			del markov[s]
 	return countlost
 
+
+savemins = 1
 async def save():
 	while 1:
-		fsize = os.path.getsize("data.json");
-		print(f'Brain was {bcolors.WARNING}{fsize}{bcolors.ENDC} bytes.')
+		fsize = os.path.getsize("data.msgpack");
+		a = datetime.datetime.now()
+		print(f'Brain was {bcolors.WARNING}{fsize}{bcolors.ENDC} bytes with {bcolors.WARNING}{len(markov)}{bcolors.ENDC} sequences.')
 		print(f'{bcolors.BOLD}{bcolors.HEADER}Decaying...{bcolors.ENDC}')
-		times = random.randrange(int(fsize**0.5))
+		times = random.randrange(int(len(markov)/8))*savemins
 		decayed = decay(times)
 		print(f'Decayed {bcolors.WARNING}{times}{bcolors.ENDC} times, losing {bcolors.WARNING}{decayed}{bcolors.ENDC} remembrances.')
+		b = datetime.datetime.now()
+		print(f'Process took {bcolors.WARNING}{int((b-a).total_seconds()*1000)} ms{bcolors.ENDC}.\n')
 		print(f'{bcolors.BOLD}{bcolors.HEADER}saving...{bcolors.ENDC}')
-		with open('data.json', 'w') as f:
-			json.dump({'queuelen':ql, 'rates':rates, 'chain':markov}, f)
-		print(f'Brain is now {bcolors.WARNING}{os.path.getsize("data.json")}{bcolors.ENDC} bytes.\n')
-		await asyncio.sleep(60);
+		with open('data.msgpack', 'wb') as f:
+			msgpack.dump({'queuelen':ql, 'rates':rates, 'chain':markov}, f)
+		print(f'Brain is now {bcolors.WARNING}{os.path.getsize("data.msgpack")}{bcolors.ENDC} bytes.')
+		print(f'Process took {bcolors.WARNING}{int((datetime.datetime.now()-b).total_seconds()*1000)} ms{bcolors.ENDC}.\n')
+		await asyncio.sleep(savemins*60);
 
 async def sendMessage(channel):
 	try:
 		out = getchars(channel.id);
 		async with channel.typing():
+			
 			await asyncio.sleep(random.random()/5*len(out))
 			await channel.send(out);
 	except Exception as e:
-		print(f'{bcolors.FAIL}{e}{bcolors.ENDC}')
+		print(f'{bcolors.FAIL}{e}{bcolors.ENDC}\n')
 
 scaryprefix = "hi this is a wendy's and also, to marc: "
 class Client(discord.Client):

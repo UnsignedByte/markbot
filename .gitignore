@@ -126,5 +126,6 @@ dmypy.json
 
 *.txt
 *.json
+*.msgpack
 
 .DS_Store
