@@ -2,7 +2,7 @@
 # @Author: UnsignedByte
 # @Date:	 23:20:21, 17-Jun-2020
 # @Last Modified by:   UnsignedByte
-# @Last Modified time: 01:58:35, 21-Jun-2020
+# @Last Modified time: 02:16:15, 21-Jun-2020
 
 import discord
 import asyncio
@@ -35,7 +35,7 @@ weights = {}
 #last messsages in each channel
 lastmsgs = {}
 
-EPSILON = 1e-9;
+EPSILON = 1e-2;
 
 #default file
 if not os.path.isfile('data.msgpack'):
@@ -62,9 +62,14 @@ def toweight(msg):
 				* (1-max([Levenshtein.ratio(msg.content, m)**2 for m in lastmsgs[msg.author.id]] + [0]))) # same messages bad
 
 def updatemarkov(channelid, content, weight):
-	if (weight < EPSILON): return;
 	if channelid not in queue: queue[channelid] = ""
 	queue[channelid]+=content
+
+	# small weight, skip other stuff
+	if (weight < EPSILON):
+		if len(queue[channelid]) > ql:
+			queue = queue[channelid][-ql:];
+		return;
 	while len(queue[channelid]) > ql:
 		for i in range(1,ql+1):
 			if queue[channelid][:i] not in markov:
@@ -118,9 +123,6 @@ def decay(times):
 	for s in chosenseq:
 		if not s in markov: continue;
 		total = sum(markov[s].values())
-		if total<EPSILON:
-			print(total)
-			print(markov[s])
 		chosenlet = random.choices(list(markov[s].keys()), k=random.randrange(len(markov[s])+1))
 		for k in chosenlet:
 			if not k in markov[s]: continue;
