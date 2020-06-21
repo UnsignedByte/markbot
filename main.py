@@ -2,7 +2,7 @@
 # @Author: UnsignedByte
 # @Date:	 23:20:21, 17-Jun-2020
 # @Last Modified by:   UnsignedByte
-# @Last Modified time: 01:40:21, 21-Jun-2020
+# @Last Modified time: 01:58:35, 21-Jun-2020
 
 import discord
 import asyncio
@@ -35,6 +35,8 @@ weights = {}
 #last messsages in each channel
 lastmsgs = {}
 
+EPSILON = 1e-9;
+
 #default file
 if not os.path.isfile('data.msgpack'):
 	with open('data.msgpack', 'wb') as f:
@@ -53,15 +55,14 @@ with open('data.msgpack', 'rb') as f:
 
 def toweight(msg):
 	# 1-\frac{1}{1+\frac{\sqrt{\frac{x}{2000}}}{1-\frac{x}{2000}}^{-3}}
-
-	# average of how similar last few messages were
 	
 	return  ((0.5 if msg.author.bot else 1) # we don't like bots that much
 				* (lambda x: 1 if x == 0 else 1-(1/(1+(x/(1-x))**-3)))(len(msg.content)/2001) # long messages also bad
 				/ weights[msg.author.id] # spammers >:(
-				* (1-max([Levenshtein.ratio(msg.content, m) for m in lastmsgs[msg.author.id]] + [0]))) # same messages bad
+				* (1-max([Levenshtein.ratio(msg.content, m)**2 for m in lastmsgs[msg.author.id]] + [0]))) # same messages bad
 
 def updatemarkov(channelid, content, weight):
+	if (weight < EPSILON): return;
 	if channelid not in queue: queue[channelid] = ""
 	queue[channelid]+=content
 	while len(queue[channelid]) > ql:
@@ -117,6 +118,9 @@ def decay(times):
 	for s in chosenseq:
 		if not s in markov: continue;
 		total = sum(markov[s].values())
+		if total<EPSILON:
+			print(total)
+			print(markov[s])
 		chosenlet = random.choices(list(markov[s].keys()), k=random.randrange(len(markov[s])+1))
 		for k in chosenlet:
 			if not k in markov[s]: continue;
@@ -126,7 +130,7 @@ def decay(times):
 			dratio = (math.sin(markov[s][k]/total*math.pi/2)**0.25)*(random.random()**0.5+1)/2;
 			markov[s][k] = dratio*markov[s][k]
 			countlost-=markov[s][k]
-			if markov[s][k] < 0.1:
+			if markov[s][k] < EPSILON:
 				del markov[s][k]
 		if len(markov[s]) == 0:
 			del markov[s]
