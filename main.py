@@ -2,7 +2,7 @@
 # @Author: UnsignedByte
 # @Date:	 23:20:21, 17-Jun-2020
 # @Last Modified by:   UnsignedByte
-# @Last Modified time: 02:32:50, 21-Jun-2020
+# @Last Modified time: 12:40:04, 21-Jun-2020
 
 import discord
 import asyncio
@@ -35,7 +35,8 @@ weights = {}
 #last messsages in each channel
 lastmsgs = {}
 
-EPSILON = 0.25;
+# when to snap the thing
+EPSILON = 250;
 
 #default file
 if not os.path.isfile('data.msgpack'):
@@ -56,10 +57,10 @@ with open('data.msgpack', 'rb') as f:
 def toweight(msg):
 	# 1-\frac{1}{1+\frac{\sqrt{\frac{x}{2000}}}{1-\frac{x}{2000}}^{-3}}
 	
-	return  ((0.5 if msg.author.bot else 1) # we don't like bots that much
+	return  int(1000*((0.5 if msg.author.bot else 1) # we don't like bots that much
 				* (lambda x: 1 if x == 0 else 1-(1/(1+(x/(1-x))**-3)))(len(msg.content)/2001) # long messages also bad
 				/ weights[msg.author.id] # spammers >:(
-				* (1-max([Levenshtein.ratio(msg.content, m)**2 for m in lastmsgs[msg.author.id]] + [0]))) # same messages bad
+				* (1-max([Levenshtein.ratio(msg.content, m)**2 for m in lastmsgs[msg.author.id]] + [0])))) # same messages bad
 
 def updatemarkov(channelid, content, weight):
 	if channelid not in queue: queue[channelid] = ""
@@ -129,8 +130,7 @@ def decay(times):
 			# decay
 			# \left(\cos\frac{\pi x}{2}\right)^{\frac{1}{4}} \cdot\left(\frac{\sqrt{n}+1}{2}\right)
 			countlost+=markov[s][k]
-			dratio = (math.sin(markov[s][k]/total*math.pi/2)**0.25)*(random.random()**0.5+1)/2;
-			markov[s][k] = dratio*markov[s][k]
+			markov[s][k] = int((math.sin(markov[s][k]/total*math.pi/2)**0.25)*(random.random()**0.5+1)/2*markov[s][k])
 			countlost-=markov[s][k]
 			if markov[s][k] < EPSILON:
 				del markov[s][k]
@@ -144,7 +144,7 @@ async def save():
 	while 1:
 		fsize = os.path.getsize("data.msgpack");
 		a = datetime.datetime.now()
-		print(f'Brain was {bcolors.WARNING}{fsize}{bcolors.ENDC} bytes with {bcolors.WARNING}{len(markov)}{bcolors.ENDC} sequences.')
+		print(f'Brain was {bcolors.WARNING}{fsize}{bcolors.ENDC} bytes a minute ago.\nBrain is now {bcolors.WARNING}{len(markov)}{bcolors.ENDC} sequences.')
 		print(f'{bcolors.BOLD}{bcolors.HEADER}Decaying...{bcolors.ENDC}')
 		decayed = 0
 		times = 0
@@ -153,7 +153,7 @@ async def save():
 			n = int(random.random()*(2/(1+(1+10**-6/8)**-len(markov))-1)*len(markov))
 			decayed += decay(n)
 			times+=n
-		print(f'Decayed {bcolors.WARNING}{times}{bcolors.ENDC} times, losing {bcolors.WARNING}{decayed}{bcolors.ENDC} remembrances.')
+		print(f'Decayed {bcolors.WARNING}{times}{bcolors.ENDC} times, losing {bcolors.WARNING}{decayed/1000}{bcolors.ENDC} remembrances.')
 		b = datetime.datetime.now()
 		print(f'Process took {bcolors.WARNING}{int((b-a).total_seconds()*1000)} ms{bcolors.ENDC}.\n')
 		print(f'{bcolors.BOLD}{bcolors.HEADER}saving...{bcolors.ENDC}')
@@ -204,7 +204,7 @@ class Client(discord.Client):
 			weights[msg.author.id] += 1;
 			weight = toweight(msg);
 			lastmsgs[msg.author.id] = lastmsgs[msg.author.id][-savedmsgnum:] + [msg.content];
-			print(f'Recieved\n{parsed}\nfrom {bcolors.OKGREEN}{msg.author.display_name}{bcolors.ENDC} with weight {bcolors.OKGREEN}{weight}{bcolors.ENDC} ({bcolors.OKGREEN}{weights[msg.author.id]}{bcolors.ENDC} message(s) queued).\n')
+			print(f'Recieved\n{parsed}\nfrom {bcolors.OKGREEN}{msg.author.display_name}{bcolors.ENDC} with weight {bcolors.OKGREEN}{weight/1000}{bcolors.ENDC} ({bcolors.OKGREEN}{weights[msg.author.id]}{bcolors.ENDC} message(s) queued).\n')
 			updatemarkov(channelid, parsed+'\n', weight)
 			if msg.author.id != self.user.id and \
 					(random.random() < (rates[channelid] if channelid in rates else 1/30) or \
