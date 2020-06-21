@@ -2,7 +2,7 @@
 # @Author: UnsignedByte
 # @Date:	 23:20:21, 17-Jun-2020
 # @Last Modified by:   UnsignedByte
-# @Last Modified time: 02:16:15, 21-Jun-2020
+# @Last Modified time: 02:17:26, 21-Jun-2020
 
 import discord
 import asyncio
@@ -68,7 +68,7 @@ def updatemarkov(channelid, content, weight):
 	# small weight, skip other stuff
 	if (weight < EPSILON):
 		if len(queue[channelid]) > ql:
-			queue = queue[channelid][-ql:];
+			queue[channelid][-ql:] = queue[channelid][-ql:];
 		return;
 	while len(queue[channelid]) > ql:
 		for i in range(1,ql+1):
