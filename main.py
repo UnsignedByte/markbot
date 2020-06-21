@@ -2,7 +2,7 @@
 # @Author: UnsignedByte
 # @Date:	 23:20:21, 17-Jun-2020
 # @Last Modified by:   UnsignedByte
-# @Last Modified time: 02:56:03, 20-Jun-2020
+# @Last Modified time: 01:40:21, 21-Jun-2020
 
 import discord
 import asyncio
@@ -14,6 +14,7 @@ import math
 import time
 import datetime
 import traceback
+import Levenshtein
 
 class bcolors:
   HEADER = '\033[95m'
@@ -25,13 +26,19 @@ class bcolors:
   BOLD = '\033[1m'
   UNDERLINE = '\033[4m'
 
+#strings in queue (by channel)???
 queue = {}
+
+#user message rate sort of
 weights = {}
+
+#last messsages in each channel
+lastmsgs = {}
 
 #default file
 if not os.path.isfile('data.msgpack'):
 	with open('data.msgpack', 'wb') as f:
-		msgpack.dump({'queuelen':10, 'chain':{}, 'rates':{}}, f)
+		msgpack.dump({'queuelen':15, 'chain':{}, 'rates':{}}, f)
 
 with open('data.msgpack', 'rb') as f:
 	try:
@@ -40,14 +47,19 @@ with open('data.msgpack', 'rb') as f:
 		markov = dat['chain']
 		rates = dat['rates']
 	except EOFError as e:
-		ql = 10
+		ql = 15
 		markov = {}
 		rates = {}
 
-def toweight(key, l):
+def toweight(msg):
 	# 1-\frac{1}{1+\frac{\sqrt{\frac{x}{2000}}}{1-\frac{x}{2000}}^{-3}}
 
-	return (lambda x: 1 if x == 0 else 1-(1/(1+(x/(1-x))**-3)))(l/2000)/weights[key]
+	# average of how similar last few messages were
+	
+	return  ((0.5 if msg.author.bot else 1) # we don't like bots that much
+				* (lambda x: 1 if x == 0 else 1-(1/(1+(x/(1-x))**-3)))(len(msg.content)/2001) # long messages also bad
+				/ weights[msg.author.id] # spammers >:(
+				* (1-max([Levenshtein.ratio(msg.content, m) for m in lastmsgs[msg.author.id]] + [0]))) # same messages bad
 
 def updatemarkov(channelid, content, weight):
 	if channelid not in queue: queue[channelid] = ""
@@ -80,7 +92,7 @@ def getchars(channelid):
 	while(len(out) < 2000):
 		c = getchar(channelid, out)
 		out+=c;
-		if out[-1] == '\n' and random.random() < 4/5: break;
+		if len(out) > 1 and out[-1] == '\n' and random.random() < 4/5: break;
 	return out[:-1];
 
 def getname(bot, msg, id):
@@ -88,8 +100,12 @@ def getname(bot, msg, id):
 	return "" if not mem else mem.display_name;
 
 def parseMessage(bot, msg): #replaces mentions with respective names
+	# return re.sub(r'<@?(.?)(:.+?:)?(\d+)>',
+	# 	lambda x:x.group(2) if x.group(2) else f"@{getname(bot, msg, int(x.group(3)))}" if x.group(1) in ['', '!'] else (lambda y:f'#{y.name if y else "deleted-channel"}')(bot.get_channel(int(x.group(3)))) if x.group(1) == '#' else (lambda y:f'@{y.name if y else "deleted-role"}')(msg.guild.get_role(int(x.group(3)))) if x.group(1) == '&' else x.group(0),
+	# 	msg.content
+	# )
 	return re.sub(r'<@?(.?)(:.+?:)?(\d+)>',
-		lambda x:x.group(2) if x.group(2) else f"@{getname(bot, msg, int(x.group(3)))}" if x.group(1) in ['', '!'] else (lambda y:f'#{y.name if y else "deleted-channel"}')(bot.get_channel(int(x.group(3)))) if x.group(1) == '#' else (lambda y:f'@{y.name if y else "deleted-role"}')(msg.guild.get_role(int(x.group(3)))) if x.group(1) == '&' else x.group(0),
+		lambda x:x.group(0) if x.group(2) else f"@{getname(bot, msg, int(x.group(3)))}" if x.group(1) in ['', '!'] else x.group(0),
 		msg.content
 	)
 
@@ -128,7 +144,7 @@ async def save():
 		times = 0
 		for i in range(savemins):
 			# \frac{2}{1+\left(1+\frac{1}{5\cdot10^{7}}\right)^{-x}}-1 
-			n = int(random.random()*(2/(1+(1+10**-6/3)**-len(markov))-1)*len(markov))
+			n = int(random.random()*(2/(1+(1+10**-6/8)**-len(markov))-1)*len(markov))
 			decayed += decay(n)
 			times+=n
 		print(f'Decayed {bcolors.WARNING}{times}{bcolors.ENDC} times, losing {bcolors.WARNING}{decayed}{bcolors.ENDC} remembrances.')
@@ -158,6 +174,7 @@ async def sendMessage(channel):
 	except Exception as e:
 		print(f'{bcolors.FAIL}{traceback.format_exc()}{bcolors.ENDC}\n')
 
+savedmsgnum = 5;
 scaryprefix = "hi this is a wendy's and also, to marc: "
 class Client(discord.Client):
 	async def on_ready(self):
@@ -177,9 +194,11 @@ class Client(discord.Client):
 			await sendMessage(msg.channel);
 		else:
 			if not msg.author.id in weights: weights[msg.author.id] = 0
+			if not msg.author.id in lastmsgs: lastmsgs[msg.author.id] = [];
 			weights[msg.author.id] += 1;
-			weight = toweight(msg.author.id, len(msg.content));
-			print(f'Recieved\n{parsed}\nfrom {bcolors.OKGREEN}{msg.author.display_name}{bcolors.ENDC} with weight {bcolors.OKGREEN}{weight}{bcolors.ENDC}.\n')
+			weight = toweight(msg);
+			lastmsgs[msg.author.id] = lastmsgs[msg.author.id][-savedmsgnum:] + [msg.content];
+			print(f'Recieved\n{parsed}\nfrom {bcolors.OKGREEN}{msg.author.display_name}{bcolors.ENDC} with weight {bcolors.OKGREEN}{weight}{bcolors.ENDC} ({bcolors.OKGREEN}{weights[msg.author.id]}{bcolors.ENDC} message(s) queued).\n')
 			updatemarkov(channelid, parsed+'\n', weight)
 			if msg.author.id != self.user.id and \
 					(random.random() < (rates[channelid] if channelid in rates else 1/30) or \
