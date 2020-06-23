@@ -2,7 +2,7 @@
 # @Author: UnsignedByte
 # @Date:	 23:20:21, 17-Jun-2020
 # @Last Modified by:   UnsignedByte
-# @Last Modified time: 12:40:04, 21-Jun-2020
+# @Last Modified time: 21:46:14, 21-Jun-2020
 
 import discord
 import asyncio
@@ -103,6 +103,7 @@ def getchars(channelid):
 	return out[:-1];
 
 def getname(bot, msg, id):
+	if not msg.guild: return bot.get_user(id).display_name;
 	mem = msg.guild.get_member(id) or bot.get_user(id);
 	return "" if not mem else mem.display_name;
 
@@ -180,7 +181,7 @@ async def sendMessage(channel):
 	except Exception as e:
 		print(f'{bcolors.FAIL}{traceback.format_exc()}{bcolors.ENDC}\n')
 
-savedmsgnum = 5;
+savedmsgnum = 10;
 scaryprefix = "hi this is a wendy's and also, to marc: "
 class Client(discord.Client):
 	async def on_ready(self):
@@ -204,7 +205,7 @@ class Client(discord.Client):
 			weights[msg.author.id] += 1;
 			weight = toweight(msg);
 			lastmsgs[msg.author.id] = lastmsgs[msg.author.id][-savedmsgnum:] + [msg.content];
-			print(f'Recieved\n{parsed}\nfrom {bcolors.OKGREEN}{msg.author.display_name}{bcolors.ENDC} with weight {bcolors.OKGREEN}{weight/1000}{bcolors.ENDC} ({bcolors.OKGREEN}{weights[msg.author.id]}{bcolors.ENDC} message(s) queued).\n')
+			print(f'{datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")}: Recieved\n{parsed}\nfrom {bcolors.OKGREEN}{msg.author.display_name}{bcolors.ENDC} with weight {bcolors.OKGREEN}{weight/1000}{bcolors.ENDC} ({bcolors.OKGREEN}{weights[msg.author.id]}{bcolors.ENDC} message(s) queued).\n')
 			updatemarkov(channelid, parsed+'\n', weight)
 			if msg.author.id != self.user.id and \
 					(random.random() < (rates[channelid] if channelid in rates else 1/30) or \
@@ -214,4 +215,4 @@ class Client(discord.Client):
 bot = Client()
 
 with open('token.txt', 'r') as f:
-	bot.run(f.read().strip())
+	bot.run(f.read().strip(), bot=True)
