@@ -2,7 +2,7 @@
 # @Author: UnsignedByte
 # @Date:	 23:20:21, 17-Jun-2020
 # @Last Modified by:   UnsignedByte
-# @Last Modified time: 21:46:14, 21-Jun-2020
+# @Last Modified time: 01:41:32, 23-Jun-2020
 
 import discord
 import asyncio
@@ -63,7 +63,6 @@ def toweight(msg):
 				* (1-max([Levenshtein.ratio(msg.content, m)**2 for m in lastmsgs[msg.author.id]] + [0])))) # same messages bad
 
 def updatemarkov(channelid, content, weight):
-	if channelid not in queue: queue[channelid] = ""
 	queue[channelid]+=content
 
 	# small weight, skip other stuff
@@ -189,6 +188,7 @@ class Client(discord.Client):
 		await asyncio.gather(save(), decSecond())
 	async def on_message(self, msg):
 		channelid = str(msg.channel.id)
+		if channelid not in queue: queue[channelid] = ""
 		if not msg.author.bot and msg.content.startswith(scaryprefix):
 			cont = msg.content[len(scaryprefix):];
 			f = re.match(r'^sucky set rate to (\d+)/(\d+)$', cont);
