@@ -2,7 +2,7 @@
 # @Author: UnsignedByte
 # @Date:	 23:20:21, 17-Jun-2020
 # @Last Modified by:   UnsignedByte
-# @Last Modified time: 01:41:32, 23-Jun-2020
+# @Last Modified time: 00:53:52, 26-Jun-2020
 
 import discord
 import asyncio
@@ -15,6 +15,8 @@ import time
 import datetime
 import traceback
 import Levenshtein
+# import nest_asyncio
+# nest_asyncio.apply()
 
 class bcolors:
   HEADER = '\033[95m'
@@ -36,7 +38,7 @@ weights = {}
 lastmsgs = {}
 
 # when to snap the thing
-EPSILON = 250;
+EPSILON = 100;
 
 #default file
 if not os.path.isfile('data.msgpack'):
@@ -124,7 +126,7 @@ def decay(times):
 	for s in chosenseq:
 		if not s in markov: continue;
 		total = sum(markov[s].values())
-		chosenlet = random.choices(list(markov[s].keys()), k=random.randrange(len(markov[s])+1))
+		chosenlet = random.choices(list(markov[s].keys()), k=1+int(random.random()*len(markov[s])//2))
 		for k in chosenlet:
 			if not k in markov[s]: continue;
 			# decay
@@ -141,8 +143,12 @@ def decay(times):
 
 savemins = 1
 async def save():
+	finished = datetime.datetime.now();
 	while 1:
 		fsize = os.path.getsize("data.msgpack");
+
+		print(f'{bcolors.WARNING}{(datetime.datetime.now()-finished).total_seconds()} seconds{bcolors.ENDC} have elapsed.')
+
 		a = datetime.datetime.now()
 		print(f'Brain was {bcolors.WARNING}{fsize}{bcolors.ENDC} bytes a minute ago.\nBrain is now {bcolors.WARNING}{len(markov)}{bcolors.ENDC} sequences.')
 		print(f'{bcolors.BOLD}{bcolors.HEADER}Decaying...{bcolors.ENDC}')
@@ -154,14 +160,19 @@ async def save():
 			decayed += decay(n)
 			times+=n
 		print(f'Decayed {bcolors.WARNING}{times}{bcolors.ENDC} times, losing {bcolors.WARNING}{decayed/1000}{bcolors.ENDC} remembrances.')
+		
 		b = datetime.datetime.now()
 		print(f'Process took {bcolors.WARNING}{int((b-a).total_seconds()*1000)} ms{bcolors.ENDC}.\n')
+		
+
 		print(f'{bcolors.BOLD}{bcolors.HEADER}saving...{bcolors.ENDC}')
 		with open('data.msgpack', 'wb') as f:
 			msgpack.dump({'queuelen':ql, 'rates':rates, 'chain':markov}, f)
+		finished = datetime.datetime.now();
 		print(f'Brain is now {bcolors.WARNING}{os.path.getsize("data.msgpack")}{bcolors.ENDC} bytes with {bcolors.WARNING}{len(markov)}{bcolors.ENDC} sequences.')
-		print(f'Process took {bcolors.WARNING}{int((datetime.datetime.now()-b).total_seconds()*1000)} ms{bcolors.ENDC}.\n')
-		await asyncio.sleep(savemins*60);
+		print(f'Process took {bcolors.WARNING}{int((finished-b).total_seconds()*1000)} ms{bcolors.ENDC}.\n')
+		while (datetime.datetime.now()-finished).total_seconds() < savemins*60:
+			await asyncio.sleep(1);
 
 #optimal seconds between messages
 msecs = 2;
@@ -180,12 +191,17 @@ async def sendMessage(channel):
 	except Exception as e:
 		print(f'{bcolors.FAIL}{traceback.format_exc()}{bcolors.ENDC}\n')
 
+started = False
 savedmsgnum = 10;
 scaryprefix = "hi this is a wendy's and also, to marc: "
 class Client(discord.Client):
 	async def on_ready(self):
+		global started
 		print("ready")
-		await asyncio.gather(save(), decSecond())
+		if started:
+			return
+		started = True
+		asyncio.gather(save(), decSecond())
 	async def on_message(self, msg):
 		channelid = str(msg.channel.id)
 		if channelid not in queue: queue[channelid] = ""
