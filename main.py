@@ -2,7 +2,7 @@
 # @Author: UnsignedByte
 # @Date:	 23:20:21, 17-Jun-2020
 # @Last Modified by:   UnsignedByte
-# @Last Modified time: 00:53:52, 26-Jun-2020
+# @Last Modified time: 13:24:09, 26-Jun-2020
 
 import discord
 import asyncio
@@ -171,8 +171,7 @@ async def save():
 		finished = datetime.datetime.now();
 		print(f'Brain is now {bcolors.WARNING}{os.path.getsize("data.msgpack")}{bcolors.ENDC} bytes with {bcolors.WARNING}{len(markov)}{bcolors.ENDC} sequences.')
 		print(f'Process took {bcolors.WARNING}{int((finished-b).total_seconds()*1000)} ms{bcolors.ENDC}.\n')
-		while (datetime.datetime.now()-finished).total_seconds() < savemins*60:
-			await asyncio.sleep(1);
+		await asyncio.sleep(savemins*60)
 
 #optimal seconds between messages
 msecs = 2;
