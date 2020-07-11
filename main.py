@@ -2,7 +2,7 @@
 # @Author: UnsignedByte
 # @Date:	 23:20:21, 17-Jun-2020
 # @Last Modified by:   UnsignedByte
-# @Last Modified time: 13:24:09, 26-Jun-2020
+# @Last Modified time: 01:54:55, 11-Jul-2020
 
 import discord
 import asyncio
@@ -126,7 +126,7 @@ def decay(times):
 	for s in chosenseq:
 		if not s in markov: continue;
 		total = sum(markov[s].values())
-		chosenlet = random.choices(list(markov[s].keys()), k=1+int(random.random()*len(markov[s])//2))
+		chosenlet = random.choices(list(markov[s].keys()), k=1+int(random.random()*len(markov[s])//4))
 		for k in chosenlet:
 			if not k in markov[s]: continue;
 			# decay
