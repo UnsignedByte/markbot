@@ -2,13 +2,14 @@
 # @Author: UnsignedByte
 # @Date:	 23:20:21, 17-Jun-2020
 # @Last Modified by:   UnsignedByte
-# @Last Modified time: 01:54:55, 11-Jul-2020
+# @Last Modified time: 21:14:20, 24-Jul-2020
 
 import discord
 import asyncio
 import re
 import msgpack
 import os
+import psutil
 import random
 import math
 import time
@@ -17,6 +18,8 @@ import traceback
 import Levenshtein
 # import nest_asyncio
 # nest_asyncio.apply()
+
+process = psutil.Process(os.getpid()) # python process
 
 class bcolors:
   HEADER = '\033[95m'
@@ -100,7 +103,9 @@ def getchars(channelid):
 	while(len(out) < 2000):
 		c = getchar(channelid, out)
 		out+=c;
-		if len(out) > 1 and out[-1] == '\n' and random.random() < 4/5: break;
+		if out[-1] == '\r':
+			if len(out) > 1: break;
+			out = "";
 	return out[:-1];
 
 def getname(bot, msg, id):
@@ -126,13 +131,13 @@ def decay(times):
 	for s in chosenseq:
 		if not s in markov: continue;
 		total = sum(markov[s].values())
-		chosenlet = random.choices(list(markov[s].keys()), k=1+int(random.random()*len(markov[s])//4))
+		chosenlet = random.choices(list(markov[s].keys()), k=1)
 		for k in chosenlet:
 			if not k in markov[s]: continue;
 			# decay
 			# \left(\cos\frac{\pi x}{2}\right)^{\frac{1}{4}} \cdot\left(\frac{\sqrt{n}+1}{2}\right)
 			countlost+=markov[s][k]
-			markov[s][k] = int((math.sin(markov[s][k]/total*math.pi/2)**0.25)*(random.random()**0.5+1)/2*markov[s][k])
+			markov[s][k] = int(max(0.1, math.sin(markov[s][k]/total*math.pi/2)**0.25)*(random.random()**0.5+1)/2*markov[s][k])
 			countlost-=markov[s][k]
 			if markov[s][k] < EPSILON:
 				del markov[s][k]
@@ -154,11 +159,12 @@ async def save():
 		print(f'{bcolors.BOLD}{bcolors.HEADER}Decaying...{bcolors.ENDC}')
 		decayed = 0
 		times = 0
-		for i in range(savemins):
-			# \frac{2}{1+\left(1+\frac{1}{5\cdot10^{7}}\right)^{-x}}-1 
-			n = int(random.random()*(2/(1+(1+10**-6/8)**-len(markov))-1)*len(markov))
-			decayed += decay(n)
-			times+=n
+		# for i in range(savemins):
+		# 	# \frac{2}{1+\left(1+\frac{1}{5\cdot10^{7}}\right)^{-x}}-1 
+		# 	# n = int(random.random()*(2/(1+(1+10**-6/8)**-len(markov))-1)*len(markov))
+		# 	n = int(random.random()*0.001*len(markov));
+		# 	decayed += decay(n)
+		# 	times+=n
 		print(f'Decayed {bcolors.WARNING}{times}{bcolors.ENDC} times, losing {bcolors.WARNING}{decayed/1000}{bcolors.ENDC} remembrances.')
 		
 		b = datetime.datetime.now()
@@ -171,6 +177,9 @@ async def save():
 		finished = datetime.datetime.now();
 		print(f'Brain is now {bcolors.WARNING}{os.path.getsize("data.msgpack")}{bcolors.ENDC} bytes with {bcolors.WARNING}{len(markov)}{bcolors.ENDC} sequences.')
 		print(f'Process took {bcolors.WARNING}{int((finished-b).total_seconds()*1000)} ms{bcolors.ENDC}.\n')
+
+		mem = process.memory_info().rss;
+		print(f'Currently using {bcolors.WARNING}{mem}{bcolors.ENDC} bytes of memory.')
 		await asyncio.sleep(savemins*60)
 
 #optimal seconds between messages
@@ -221,7 +230,7 @@ class Client(discord.Client):
 			weight = toweight(msg);
 			lastmsgs[msg.author.id] = lastmsgs[msg.author.id][-savedmsgnum:] + [msg.content];
 			print(f'{datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")}: Recieved\n{parsed}\nfrom {bcolors.OKGREEN}{msg.author.display_name}{bcolors.ENDC} with weight {bcolors.OKGREEN}{weight/1000}{bcolors.ENDC} ({bcolors.OKGREEN}{weights[msg.author.id]}{bcolors.ENDC} message(s) queued).\n')
-			updatemarkov(channelid, parsed+'\n', weight)
+			updatemarkov(channelid, parsed+'\r', weight)
 			if msg.author.id != self.user.id and \
 					(random.random() < (rates[channelid] if channelid in rates else 1/30) or \
 					self.user in msg.mentions):
