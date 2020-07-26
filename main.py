@@ -2,7 +2,7 @@
 # @Author: UnsignedByte
 # @Date:	 23:20:21, 17-Jun-2020
 # @Last Modified by:   UnsignedByte
-# @Last Modified time: 21:14:20, 24-Jul-2020
+# @Last Modified time: 05:48:15, 26-Jul-2020
 
 import discord
 import asyncio
@@ -39,6 +39,9 @@ weights = {}
 
 #last messsages in each channel
 lastmsgs = {}
+
+# queued messages existing?
+queued = {}
 
 # when to snap the thing
 EPSILON = 100;
@@ -118,10 +121,10 @@ def parseMessage(bot, msg): #replaces mentions with respective names
 	# 	lambda x:x.group(2) if x.group(2) else f"@{getname(bot, msg, int(x.group(3)))}" if x.group(1) in ['', '!'] else (lambda y:f'#{y.name if y else "deleted-channel"}')(bot.get_channel(int(x.group(3)))) if x.group(1) == '#' else (lambda y:f'@{y.name if y else "deleted-role"}')(msg.guild.get_role(int(x.group(3)))) if x.group(1) == '&' else x.group(0),
 	# 	msg.content
 	# )
-	return re.sub(r'<@?(.?)(:.+?:)?(\d+)>',
+	return (re.sub(r'<@?(.?)(:.+?:)?(\d+)>',
 		lambda x:x.group(0) if x.group(2) else f"@{getname(bot, msg, int(x.group(3)))}" if x.group(1) in ['', '!'] else x.group(0),
 		msg.content
-	)
+	)+''.join('\n'+x.url for x in msg.attachments)).strip()
 
 #decay brain data randomly
 def decay(times):
@@ -131,7 +134,7 @@ def decay(times):
 	for s in chosenseq:
 		if not s in markov: continue;
 		total = sum(markov[s].values())
-		chosenlet = random.choices(list(markov[s].keys()), k=1)
+		chosenlet = random.choices(list(markov[s].keys()), k=len(markov[s])//5+1)
 		for k in chosenlet:
 			if not k in markov[s]: continue;
 			# decay
@@ -159,12 +162,12 @@ async def save():
 		print(f'{bcolors.BOLD}{bcolors.HEADER}Decaying...{bcolors.ENDC}')
 		decayed = 0
 		times = 0
-		# for i in range(savemins):
-		# 	# \frac{2}{1+\left(1+\frac{1}{5\cdot10^{7}}\right)^{-x}}-1 
-		# 	# n = int(random.random()*(2/(1+(1+10**-6/8)**-len(markov))-1)*len(markov))
-		# 	n = int(random.random()*0.001*len(markov));
-		# 	decayed += decay(n)
-		# 	times+=n
+		for i in range(savemins):
+			# \frac{2}{1+\left(1+\frac{1}{5\cdot10^{7}}\right)^{-x}}-1 
+			# n = int(random.random()*(2/(1+(1+10**-6/8)**-len(markov))-1)*len(markov))
+			n = int(random.random()*0.001*len(markov));
+			decayed += decay(n)
+			times+=n
 		print(f'Decayed {bcolors.WARNING}{times}{bcolors.ENDC} times, losing {bcolors.WARNING}{decayed/1000}{bcolors.ENDC} remembrances.')
 		
 		b = datetime.datetime.now()
@@ -191,6 +194,8 @@ async def decSecond():
 		await asyncio.sleep(1);
 
 async def sendMessage(channel):
+	if channel.id in queued and queued[channel.id]: return;
+	queued[channel.id] = True;
 	try:
 		out = getchars(str(channel.id));
 		async with channel.typing():
@@ -198,6 +203,8 @@ async def sendMessage(channel):
 			await channel.send(out);
 	except Exception as e:
 		print(f'{bcolors.FAIL}{traceback.format_exc()}{bcolors.ENDC}\n')
+	finally:
+		queued[channel.id] = False;
 
 started = False
 savedmsgnum = 10;
