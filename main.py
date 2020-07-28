@@ -2,7 +2,7 @@
 # @Author: UnsignedByte
 # @Date:	 23:20:21, 17-Jun-2020
 # @Last Modified by:   UnsignedByte
-# @Last Modified time: 05:48:15, 26-Jul-2020
+# @Last Modified time: 05:57:39, 26-Jul-2020
 
 import discord
 import asyncio
@@ -68,7 +68,7 @@ def toweight(msg):
 	return  int(1000*((0.5 if msg.author.bot else 1) # we don't like bots that much
 				* (lambda x: 1 if x == 0 else 1-(1/(1+(x/(1-x))**-3)))(len(msg.content)/2001) # long messages also bad
 				/ weights[msg.author.id] # spammers >:(
-				* (1-max([Levenshtein.ratio(msg.content, m)**2 for m in lastmsgs[msg.author.id]] + [0])))) # same messages bad
+				* (1-max([Levenshtein.ratio(msg.content, m)**2 for m in lastmsgs[msg.channel.id][msg.author.id]] + [0])))) # same messages bad
 
 def updatemarkov(channelid, content, weight):
 	queue[channelid]+=content
@@ -232,10 +232,11 @@ class Client(discord.Client):
 			await sendMessage(msg.channel);
 		else:
 			if not msg.author.id in weights: weights[msg.author.id] = 0
-			if not msg.author.id in lastmsgs: lastmsgs[msg.author.id] = [];
+			if not msg.channel.id in lastmsgs: lastmsgs[msg.channel.id] = {};
+			if not msg.author.id in lastmsgs[msg.channel.id]: lastmsgs[msg.channel.id][msg.author.id] = [];
 			weights[msg.author.id] += 1;
 			weight = toweight(msg);
-			lastmsgs[msg.author.id] = lastmsgs[msg.author.id][-savedmsgnum:] + [msg.content];
+			lastmsgs[msg.channel.id][msg.author.id] = lastmsgs[msg.channel.id][msg.author.id][-savedmsgnum:] + [msg.content];
 			print(f'{datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")}: Recieved\n{parsed}\nfrom {bcolors.OKGREEN}{msg.author.display_name}{bcolors.ENDC} with weight {bcolors.OKGREEN}{weight/1000}{bcolors.ENDC} ({bcolors.OKGREEN}{weights[msg.author.id]}{bcolors.ENDC} message(s) queued).\n')
 			updatemarkov(channelid, parsed+'\r', weight)
 			if msg.author.id != self.user.id and \
