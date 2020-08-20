@@ -2,12 +2,12 @@
 # @Author: UnsignedByte
 # @Date:	 23:20:21, 17-Jun-2020
 # @Last Modified by:   UnsignedByte
-# @Last Modified time: 05:57:39, 26-Jul-2020
+# @Last Modified time: 11:40:40, 20-Aug-2020
 
+import json
 import discord
 import asyncio
 import re
-import msgpack
 import os
 import psutil
 import random
@@ -19,8 +19,6 @@ import Levenshtein
 # import nest_asyncio
 # nest_asyncio.apply()
 
-process = psutil.Process(os.getpid()) # python process
-
 class bcolors:
   HEADER = '\033[95m'
   OKBLUE = '\033[94m'
@@ -30,6 +28,9 @@ class bcolors:
   ENDC = '\033[0m'
   BOLD = '\033[1m'
   UNDERLINE = '\033[4m'
+
+
+process = psutil.Process(os.getpid()) # python process
 
 #strings in queue (by channel)???
 queue = {}
@@ -47,28 +48,44 @@ queued = {}
 EPSILON = 100;
 
 #default file
-if not os.path.isfile('data.msgpack'):
-	with open('data.msgpack', 'wb') as f:
-		msgpack.dump({'queuelen':15, 'chain':{}, 'rates':{}}, f)
+if not os.path.isdir('data/config.json'):
+	with open('data/config.json', 'w') as f:
+		json.dump({'queuelen':15, 'rates':{}}, f, indent=2)
 
-with open('data.msgpack', 'rb') as f:
+with open('data/config.json', 'r') as f:
 	try:
-		dat = msgpack.load(f)
+		dat = json.load(f)
 		ql = dat['queuelen']
-		markov = dat['chain']
 		rates = dat['rates']
 	except EOFError as e:
 		ql = 15
-		markov = {}
 		rates = {}
 
 def toweight(msg):
 	# 1-\frac{1}{1+\frac{\sqrt{\frac{x}{2000}}}{1-\frac{x}{2000}}^{-3}}
-	
 	return  int(1000*((0.5 if msg.author.bot else 1) # we don't like bots that much
 				* (lambda x: 1 if x == 0 else 1-(1/(1+(x/(1-x))**-3)))(len(msg.content)/2001) # long messages also bad
 				/ weights[msg.author.id] # spammers >:(
 				* (1-max([Levenshtein.ratio(msg.content, m)**2 for m in lastmsgs[msg.channel.id][msg.author.id]] + [0])))) # same messages bad
+
+def ssplit(s):
+	return ['f\\' if x is '/' else x for x in list(s)];
+
+def toPath(s):
+	return os.path.join('data', *ssplit(s), 'data.json');
+
+def exists(s):
+	return os.path.isfile(toPath(s));
+
+def read(s):
+	try:
+		return json.load(open(toPath(s), 'r'));
+	except ValueError:
+		return {};
+
+def write(s, v):
+	os.makedirs(os.path.join('data', *ssplit(s)), exist_ok=True)
+	return json.dump(v, open(toPath(s), 'w'));
 
 def updatemarkov(channelid, content, weight):
 	queue[channelid]+=content
@@ -80,20 +97,23 @@ def updatemarkov(channelid, content, weight):
 		return;
 	while len(queue[channelid]) > ql:
 		for i in range(1,ql+1):
-			if queue[channelid][:i] not in markov:
-				markov[queue[channelid][:i]] = {};
-			if queue[channelid][i] not in markov[queue[channelid][:i]]:
-				markov[queue[channelid][:i]][queue[channelid][i]] = weight;
+			v = {};
+			if exists(queue[channelid][:i]):
+				v = read(queue[channelid][:i]);
+			if queue[channelid][i] not in v:
+				v[queue[channelid][i]] = weight;
 			else:
-				markov[queue[channelid][:i]][queue[channelid][i]] += weight;
+				v[queue[channelid][i]] += weight;
+			write(queue[channelid][:i], v);
 		queue[channelid] = queue[channelid][1:]
 
 def getchar(channelid, tq):
 	out = '\n'
 	last = queue[channelid]+tq;
 	for i in range(ql,0,-1):
-		if len(last) < i or last[-i:] not in markov: continue;
-		curr = markov[last[-i:]]
+		l = toPath(last[-i:]);
+		if len(last) < i or not exists(last[-i:]): continue;
+		curr = read(last[-i:]);
 		ret = random.choices(list(curr.keys()), weights=list(curr.values()), k=1)[0];
 		if random.random() < 0.5:
 			return ret
@@ -127,62 +147,46 @@ def parseMessage(bot, msg): #replaces mentions with respective names
 	)+''.join('\n'+x.url for x in msg.attachments)).strip()
 
 #decay brain data randomly
-def decay(times):
-	countlost = 0;
-	if len(markov) == 0: return 0;
-	chosenseq = random.choices(list(markov.keys()), k=times)
-	for s in chosenseq:
-		if not s in markov: continue;
-		total = sum(markov[s].values())
-		chosenlet = random.choices(list(markov[s].keys()), k=len(markov[s])//5+1)
-		for k in chosenlet:
-			if not k in markov[s]: continue;
-			# decay
-			# \left(\cos\frac{\pi x}{2}\right)^{\frac{1}{4}} \cdot\left(\frac{\sqrt{n}+1}{2}\right)
-			countlost+=markov[s][k]
-			markov[s][k] = int(max(0.1, math.sin(markov[s][k]/total*math.pi/2)**0.25)*(random.random()**0.5+1)/2*markov[s][k])
-			countlost-=markov[s][k]
-			if markov[s][k] < EPSILON:
-				del markov[s][k]
-		if len(markov[s]) == 0:
-			del markov[s]
-	return countlost
+# def decay(times):
+# 	countlost = 0;
+# 	if len(markov) == 0: return 0;
+# 	chosenseq = random.choices(list(markov.keys()), k=times)
+# 	for s in chosenseq:
+# 		if not s in markov: continue;
+# 		total = sum(markov[s].values())
+# 		chosenlet = random.choices(list(markov[s].keys()), k=len(markov[s])//2+1)
+# 		for k in chosenlet:
+# 			if not k in markov[s]: continue;
+# 			# decay
+# 			# \left(\cos\frac{\pi x}{2}\right)^{\frac{1}{4}} \cdot\left(\frac{\sqrt{n}+1}{2}\right)
+# 			countlost+=markov[s][k]
+# 			markov[s][k] = int(max(0.1, math.sin(markov[s][k]/total*math.pi/2)**0.25)*(random.random()**0.5+1)/2*markov[s][k])
+# 			countlost-=markov[s][k]
+# 			if markov[s][k] < EPSILON:
+# 				del markov[s][k]
+# 		if len(markov[s]) == 0:
+# 			del markov[s]
+# 	return countlost
 
 
 savemins = 1
 async def save():
 	finished = datetime.datetime.now();
 	while 1:
-		fsize = os.path.getsize("data.msgpack");
+		fsize = os.path.getsize("data/");
 
 		print(f'{bcolors.WARNING}{(datetime.datetime.now()-finished).total_seconds()} seconds{bcolors.ENDC} have elapsed.')
 
 		a = datetime.datetime.now()
-		print(f'Brain was {bcolors.WARNING}{fsize}{bcolors.ENDC} bytes a minute ago.\nBrain is now {bcolors.WARNING}{len(markov)}{bcolors.ENDC} sequences.')
-		print(f'{bcolors.BOLD}{bcolors.HEADER}Decaying...{bcolors.ENDC}')
-		decayed = 0
-		times = 0
-		for i in range(savemins):
-			# \frac{2}{1+\left(1+\frac{1}{5\cdot10^{7}}\right)^{-x}}-1 
-			# n = int(random.random()*(2/(1+(1+10**-6/8)**-len(markov))-1)*len(markov))
-			n = int(random.random()*0.001*len(markov));
-			decayed += decay(n)
-			times+=n
-		print(f'Decayed {bcolors.WARNING}{times}{bcolors.ENDC} times, losing {bcolors.WARNING}{decayed/1000}{bcolors.ENDC} remembrances.')
-		
-		b = datetime.datetime.now()
-		print(f'Process took {bcolors.WARNING}{int((b-a).total_seconds()*1000)} ms{bcolors.ENDC}.\n')
+		print(f'Brain is {bcolors.WARNING}{fsize}{bcolors.ENDC} bytes.')
 		
 
 		print(f'{bcolors.BOLD}{bcolors.HEADER}saving...{bcolors.ENDC}')
-		with open('data.msgpack', 'wb') as f:
-			msgpack.dump({'queuelen':ql, 'rates':rates, 'chain':markov}, f)
+		with open('data/config.json', 'w') as f:
+			json.dump({'queuelen':ql, 'rates':rates}, f, indent=2)
 		finished = datetime.datetime.now();
-		print(f'Brain is now {bcolors.WARNING}{os.path.getsize("data.msgpack")}{bcolors.ENDC} bytes with {bcolors.WARNING}{len(markov)}{bcolors.ENDC} sequences.')
-		print(f'Process took {bcolors.WARNING}{int((finished-b).total_seconds()*1000)} ms{bcolors.ENDC}.\n')
+		print(f'Process took {bcolors.WARNING}{int((finished-a).total_seconds()*1000)} ms{bcolors.ENDC}.\n')
 
-		mem = process.memory_info().rss;
-		print(f'Currently using {bcolors.WARNING}{mem}{bcolors.ENDC} bytes of memory.')
 		await asyncio.sleep(savemins*60)
 
 #optimal seconds between messages
@@ -240,7 +244,7 @@ class Client(discord.Client):
 			print(f'{datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")}: Recieved\n{parsed}\nfrom {bcolors.OKGREEN}{msg.author.display_name}{bcolors.ENDC} with weight {bcolors.OKGREEN}{weight/1000}{bcolors.ENDC} ({bcolors.OKGREEN}{weights[msg.author.id]}{bcolors.ENDC} message(s) queued).\n')
 			updatemarkov(channelid, parsed+'\r', weight)
 			if msg.author.id != self.user.id and \
-					(random.random() < (rates[channelid] if channelid in rates else 1/30) or \
+					(random.random() < (rates[channelid] if channelid in rates else 1/50) or \
 					self.user in msg.mentions):
 				await sendMessage(msg.channel);
 
