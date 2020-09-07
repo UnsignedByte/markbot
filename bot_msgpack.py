@@ -228,7 +228,7 @@ class Client(discord.Client):
 				print(f"{bcolors.HEADER}Set rate for channel {msg.channel.name} to {rates[channelid]}.{bcolors.ENDC}\n")
 			return;
 		parsed = parseMessage(bot, msg)
-		if re.match(f'<@!?{self.user.id}>', msg.content):
+		if re.match(f'^<@!?{self.user.id}>$', msg.content):
 			await sendMessage(msg.channel);
 		else:
 			if not msg.author.id in weights: weights[msg.author.id] = 0
