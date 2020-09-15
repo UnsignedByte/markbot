@@ -121,8 +121,8 @@ def parseMessage(bot, msg): #replaces mentions with respective names
 	# 	lambda x:x.group(2) if x.group(2) else f"@{getname(bot, msg, int(x.group(3)))}" if x.group(1) in ['', '!'] else (lambda y:f'#{y.name if y else "deleted-channel"}')(bot.get_channel(int(x.group(3)))) if x.group(1) == '#' else (lambda y:f'@{y.name if y else "deleted-role"}')(msg.guild.get_role(int(x.group(3)))) if x.group(1) == '&' else x.group(0),
 	# 	msg.content
 	# )
-	return (re.sub(r'<@?(.?)(:.+?:)?(\d+)>',
-		lambda x:x.group(0) if x.group(2) else f"@{getname(bot, msg, int(x.group(3)))}" if x.group(1) in ['', '!'] else f"@{msg.guild.get_role(int(x.group(3))).name}" if x.group(1) == '&' else x.group(0),
+	return (re.sub(r'<@?([!&#])?(:.+?:)?(\d+)>',
+		lambda x:x.group(0) if x.group(2) else f"@{getname(bot, msg, int(x.group(3)))}" if x.group(1) in [None, '!'] else f"@{msg.guild.get_role(int(x.group(3))).name}" if x.group(1) == '&' else x.group(0),
 		msg.content
 	)+''.join('\n'+x.url for x in msg.attachments)).strip()
 
