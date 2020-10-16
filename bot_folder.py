@@ -2,7 +2,7 @@
 # @Author: UnsignedByte
 # @Date:	 23:20:21, 17-Jun-2020
 # @Last Modified by:   UnsignedByte
-# @Last Modified time: 11:40:40, 20-Aug-2020
+# @Last Modified time: 08:50:58, 25-Aug-2020
 
 import json
 import discord
@@ -224,7 +224,7 @@ class Client(discord.Client):
 	async def on_message(self, msg):
 		channelid = str(msg.channel.id)
 		if channelid not in queue: queue[channelid] = ""
-		if not msg.author.bot and msg.content.startswith(scaryprefix):
+		if not msg.author.bot and msg.content.startswith(scaryprefix) and msg.author.id == 418827664304898048:
 			cont = msg.content[len(scaryprefix):];
 			f = re.match(r'^sucky set rate to (\d+)/(\d+)$', cont);
 			if f:
@@ -243,6 +243,9 @@ class Client(discord.Client):
 			lastmsgs[msg.channel.id][msg.author.id] = lastmsgs[msg.channel.id][msg.author.id][-savedmsgnum:] + [msg.content];
 			print(f'{datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")}: Recieved\n{parsed}\nfrom {bcolors.OKGREEN}{msg.author.display_name}{bcolors.ENDC} with weight {bcolors.OKGREEN}{weight/1000}{bcolors.ENDC} ({bcolors.OKGREEN}{weights[msg.author.id]}{bcolors.ENDC} message(s) queued).\n')
 			updatemarkov(channelid, parsed+'\r', weight)
+
+			if random.random() < 1/50:
+				await msg.add_reaction('⭐');
 			if msg.author.id != self.user.id and \
 					(random.random() < (rates[channelid] if channelid in rates else 1/50) or \
 					self.user in msg.mentions):
