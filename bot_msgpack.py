@@ -2,7 +2,7 @@
 # @Author: UnsignedByte
 # @Date:	 23:20:21, 17-Jun-2020
 # @Last Modified by:   UnsignedByte
-# @Last Modified time: 21:53:57, 06-Aug-2020
+# @Last Modified time: 10:40:13, 09-Dec-2020
 
 import discord
 import asyncio
@@ -165,7 +165,8 @@ async def save():
 		for i in range(savemins):
 			# \frac{2}{1+\left(1+\frac{1}{5\cdot10^{7}}\right)^{-x}}-1 
 			# n = int(random.random()*(2/(1+(1+10**-6/8)**-len(markov))-1)*len(markov))
-			n = int(random.random()*0.005*len(markov));
+			# n = int(random.random()*0.005*len(markov));
+			n = 0;
 			decayed += decay(n)
 			times+=n
 		print(f'Decayed {bcolors.WARNING}{times}{bcolors.ENDC} times, losing {bcolors.WARNING}{decayed/1000}{bcolors.ENDC} remembrances.')
