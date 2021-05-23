@@ -2,7 +2,7 @@
 # @Author: UnsignedByte
 # @Date:	 23:20:21, 17-Jun-2020
 # @Last Modified by:   UnsignedByte
-# @Last Modified time: 10:40:13, 09-Dec-2020
+# @Last Modified time: 2021-05-23 14:21:34
 
 import discord
 import asyncio
@@ -209,7 +209,7 @@ async def sendMessage(channel):
 
 started = False
 savedmsgnum = 10;
-scaryprefix = "hi this is a wendy's and also, to marc: "
+scaryprefix = "m:"
 class Client(discord.Client):
 	async def on_ready(self):
 		global started
@@ -223,10 +223,12 @@ class Client(discord.Client):
 		if channelid not in queue: queue[channelid] = ""
 		if not msg.author.bot and msg.content.startswith(scaryprefix):
 			cont = msg.content[len(scaryprefix):];
-			f = re.match(r'^sucky set rate to (\d+)/(\d+)$', cont);
+			f = re.match(r'^set rate to (\d+)/(\d+)$', cont);
 			if f:
 				rates[channelid] = int(f.group(1))/int(f.group(2));
 				print(f"{bcolors.HEADER}Set rate for channel {msg.channel.name} to {rates[channelid]}.{bcolors.ENDC}\n")
+			if cont == "size":
+				await msg.channel.send(f"Marc is {os.path.getsize('data.msgpack')} bytes in size.");
 			return;
 		parsed = parseMessage(bot, msg)
 		if re.match(f'^<@!?{self.user.id}>$', msg.content):
