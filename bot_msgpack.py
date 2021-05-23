@@ -2,7 +2,7 @@
 # @Author: UnsignedByte
 # @Date:	 23:20:21, 17-Jun-2020
 # @Last Modified by:   UnsignedByte
-# @Last Modified time: 2021-05-23 14:23:37
+# @Last Modified time: 2021-05-23 14:25:37
 
 import discord
 import asyncio
@@ -228,7 +228,7 @@ class Client(discord.Client):
 				rates[channelid] = int(f.group(1))/int(f.group(2));
 				print(f"{bcolors.HEADER}Set rate for channel {msg.channel.name} to {rates[channelid]}.{bcolors.ENDC}\n")
 			if cont == "size":
-				await msg.channel.send(f"Marc is {os.path.getsize('data.msgpack')} bytes in size.");
+				await msg.channel.send(f"Marc is {os.path.getsize('data.msgpack')} bytes in size with {len(markov)} sequences.");
 			return;
 		parsed = parseMessage(bot, msg)
 		if re.match(f'^<@!?{self.user.id}>$', msg.content):
